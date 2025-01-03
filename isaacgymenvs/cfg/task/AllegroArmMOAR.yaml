@@ -16,6 +16,7 @@ env:
     pointcloud:
       bound: [0.5, 10, -1, 1, 0.12, 0.8]  
       numSample: 808  
+      pae: /workspace/code/Point-Cloud-Autoencoder/output/output9/model_best.pth
 
   camera:
     pos: [0.45252319, 0.33285737, 0.5127288]  

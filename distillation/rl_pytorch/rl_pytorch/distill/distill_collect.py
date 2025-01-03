@@ -386,8 +386,9 @@ class DistillCollector:
                 if i % 200 == 199:
                     for key in storage.keys():
                         storage[key] = torch.stack(storage[key], dim=0)
-                        print(storage[key].shape)
-                    save_dir = os.path.join(self.teacher_data_dir, "teacher_batch_{}_{}.pt".format(self.worker_id, int((i-199)/200)))
+                        # print(storage[key].shape)
+
+                    save_dir = os.path.join(self.teacher_data_dir, "teacher_batch_{}_{}.pt".format(self.worker_id, it))
                     torch.save((storage['obs'], storage['actions'], storage['sigmas'], storage['pointcloud']), save_dir)  
                     storage = {'obs': [], 'actions': [], 'sigmas': [], 'pointcloud': []} 
                     reward_sum = []

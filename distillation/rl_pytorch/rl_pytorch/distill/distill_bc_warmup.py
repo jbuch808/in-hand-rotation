@@ -466,6 +466,8 @@ class DistillWarmUpTrainer:
         for epoch in range(self.num_learning_epochs):
             print("UPDATE START EPOCH", epoch)
             for batch_idx, indices in enumerate(batch):
+                if indices[-1] > teacher_obs_storage.shape[0]:
+                    break
                 teacher_obs_batch = teacher_obs_storage[indices].to(self.device)
                 teacher_actions_batch = teacher_actions_storage[indices].to(self.device)
                 teacher_sigmas_batch = teacher_sigmas_storage[indices].to(self.device)

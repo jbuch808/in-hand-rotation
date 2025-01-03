@@ -40,7 +40,7 @@ distill:
     ent_coef: 0  # 0.1
     nsteps: 200
     noptepochs: 5
-    nminibatches: 128 # this is per agent
+    nminibatches: 64 # this is per agent
     batch_size: 8192
     optim_stepsize: 5e-5  
     weight_decay: 0

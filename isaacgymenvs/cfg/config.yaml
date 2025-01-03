@@ -33,11 +33,14 @@ num_subscenes: 4 # Splits the simulation into N physics scenes and runs each one
 
 # RLGames Arguments
 # test - if set, run policy in inference mode (requires setting checkpoint to load)
-test: False
+test: True
 # used to set checkpoint path
-checkpoint: ''
+# checkpoint: 'runs/baoding/baodingS1.0_C0.0_M0.02024-10-31_20-44-12-3278/nn/last_baoding_ep_500_rew_1003.76605.pth'
+# checkpoint: 'runs/baoding/baodingS1.0_C0.0_M0.02024-12-19_15-49-20-3278/nn/baoding.pth'
+checkpoint: 'runs/student/bc-baoding-multimodplus/model_bc_50.pth'
 # set to True to use multi-gpu horovod training
 multi_gpu: False
+PAE: True
 
 wandb_activate: False
 wandb_group: ''

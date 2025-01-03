@@ -1121,7 +1121,8 @@ class AllegroArmMOAR(VecTask):
                 self.states_buf[:, obs_end:obs_end + self.num_actions] = self.actions
                 self.states_buf[:, obs_end + self.num_actions: obs_end + self.num_actions + 24] = self.spin_axis.repeat(1, 8)
 
-                all_contact = self.contact_tensor.reshape(-1, 49, 3).clone()
+                all_contact = torch.nn.functional.pad(self.contact_tensor, (0, 3), mode='constant', value=0)
+                all_contact = all_contact.reshape(-1, 49, 3).clone()  # self.contact_tensor.reshape(-1, 49, 3).clone()
                 all_contact = torch.norm(all_contact, dim=-1).float()
                 all_contact = torch.where(all_contact >= 20.0, torch.ones_like(all_contact), all_contact / 20.0)
                 self.states_buf[:, obs_end + self.num_actions + 24: obs_end + self.num_actions + 24 + 49] = all_contact
@@ -1137,7 +1138,8 @@ class AllegroArmMOAR(VecTask):
             self.last_obs_buf[:, 0:6] = 0.0
             self.last_obs_buf[:, 22:45] = 0
 
-            contacts = self.contact_tensor.reshape(-1, 49, 3).clone() 
+            contacts = torch.nn.functional.pad(self.contact_tensor, (0, 3), mode='constant', value=0)
+            contacts = contacts.reshape(-1, 49, 3).clone() # self.contact_tensor.reshape(-1, 49, 3).clone() 
             contacts = contacts[:, self.sensor_handle_indices, :] 
             tip_contacts = contacts[:, self.fingertip_indices, :]
 
@@ -1212,7 +1214,8 @@ class AllegroArmMOAR(VecTask):
                 self.states_buf[:, obs_end:obs_end + self.num_actions] = self.actions
                 self.states_buf[:, obs_end + self.num_actions: obs_end + self.num_actions + 24] = self.spin_axis.repeat(1, 8)
 
-                all_contact = self.contact_tensor.reshape(-1, 49, 3).clone()
+                all_contact = torch.nn.functional.pad(self.contact_tensor, (0, 3), mode='constant', value=0)
+                all_contact = all_contact.reshape(-1, 49, 3).clone()  # self.contact_tensor.reshape(-1, 49, 3).clone()
                 all_contact = torch.norm(all_contact, dim=-1).float()
                 all_contact = torch.where(all_contact >= 20.0, torch.ones_like(all_contact), all_contact / 20.0)
                 self.states_buf[:, obs_end + self.num_actions + 24: obs_end + self.num_actions + 24 + 49] = all_contact
@@ -1238,7 +1241,9 @@ class AllegroArmMOAR(VecTask):
             self.last_obs_buf[:, 0:6] = 0.0
             self.last_obs_buf[:, 22:45] = 0
 
-            contacts = self.contact_tensor.reshape(-1, 49, 3).clone() 
+            
+            contacts = torch.nn.functional.pad(self.contact_tensor, (0, 3), mode='constant', value=0)
+            contacts = contacts.reshape(-1, 49, 3).clone() # self.contact_tensor.reshape(-1, 49, 3).clone() 
             contacts = contacts[:, self.sensor_handle_indices, :]
             tip_contacts = contacts[:, self.fingertip_indices, :]
 

@@ -51,6 +51,10 @@ import open3d as o3d
 
 import pytorch3d
 
+sys.path.append('/workspace/code/Point-Cloud-Autoencoder')
+from model import PointCloudAE2 as PAE
+from model import gen_pc
+
 EXISTING_SIM = None
 SCREEN_CAPTURE_RESOLUTION = (1027, 768)
 
@@ -134,6 +138,17 @@ class Env(ABC):
 
         self.clip_obs = config["env"].get("clipObservations", np.Inf)
         self.clip_actions = config["env"].get("clipActions", np.Inf)
+
+        pae_checkpoint = config["env"]["observation"]["pointcloud"].get("pae", None)
+        if pae_checkpoint:        
+            self.pae = PAE(808, 128)
+            checkpoint = torch.load(pae_checkpoint, map_location=self.device)
+            base_model = {k.replace('module.', ''): v for k, v in checkpoint['base_model'].items()}
+            self.pae.load_state_dict(base_model)
+            self.pae.eval()
+            self.pae = self.pae.to(self.device)
+        else:
+            self.pae = None
 
     def set_test_mode(self, is_test=False):
         pass
@@ -589,10 +604,16 @@ class VecTask(Env):
 
         camera_params = self.cfg["env"]["camera"]
         camera_props = gymapi.CameraProperties()
+
+        # camera_props.enable_tensors = True
+        # camera_handle = self.gym.create_camera_sensor(self.envs[0], camera_props)
+
         camera_props.width = camera_params["width"]
         camera_props.height = camera_params["height"]
         camera_props.horizontal_fov = camera_params["fov"]
         camera_props.enable_tensors = self.cfg["sim"]["use_gpu_pipeline"]
+        camera_props.near_plane = 0.1
+        camera_props.far_plane = 100
         f = camera_params["width"] / 2 / np.tan(np.deg2rad(camera_params["fov"]) / 2)
         camera_mat = np.array([[f, 0, camera_params["width"] / 2], [0, f, camera_params["height"] / 2], [0, 0, 1]])
         camera_pose_list = []
@@ -657,6 +678,7 @@ class VecTask(Env):
             pc_tmp = []
             fsr_pc_tmp = []
             rb_dict = self.gym.get_actor_rigid_body_dict(self.envs[i], self.arm_hands[i])
+            num_FSR_sample_points = 8
             
             triggered_contact = list(torch.where(self.obs_buf[i, 45:61])[0].cpu().numpy())
             triggered_contact_name = []
@@ -668,10 +690,10 @@ class VecTask(Env):
                 rot1 = rot_matrix_from_quaternion(link_state[3:7]).cpu().numpy()
                 if name[:4] == 'palm' or name == 'world':
                     continue
-                if name in triggered_contact_name:
-                    fsr_sample_pts = torch.tensor([[random.uniform(-contact_box_size[0] / 2, contact_box_size[0] / 2) for _ in range(8)],
-                                        [random.uniform(-contact_box_size[1] / 2, contact_box_size[1] / 2) for _ in range(8)],
-                                        [random.uniform(-contact_box_size[2] / 2, contact_box_size[2] / 2) for _ in range(8)]]).transpose(0, 1)
+                if name in triggered_contact_name:                    
+                    fsr_sample_pts = torch.tensor([[random.uniform(-contact_box_size[0] / 2, contact_box_size[0] / 2) for _ in range(num_FSR_sample_points)],
+                                        [random.uniform(-contact_box_size[1] / 2, contact_box_size[1] / 2) for _ in range(num_FSR_sample_points)],
+                                        [random.uniform(-contact_box_size[2] / 2, contact_box_size[2] / 2) for _ in range(num_FSR_sample_points)]]).transpose(0, 1)
                     fsr_sample_pts = fsr_sample_pts @ rot1.T
                     fsr_sample_pts = fsr_sample_pts + link_state[:3].cpu().numpy()
                     fsr_pc_tmp.append(fsr_sample_pts)
@@ -701,10 +723,11 @@ class VecTask(Env):
             if len(fsr_pc_tmp) > 0:
                 fsr_pc_tmp = torch.cat(fsr_pc_tmp, dim=0)
                 n_tactile = fsr_pc_tmp.shape[0]
-                fsr_pc_tmp = torch.nn.functional.pad(fsr_pc_tmp, [0, 0, 0, 128 - n_tactile])
+                fsr_pc_tmp = torch.nn.functional.pad(fsr_pc_tmp, [0, 0, 0, (num_FSR_sample_points * 16) - n_tactile])
                 fsr_pc_tmp[n_tactile:, :] = fsr_pc_tmp[0, :]
             else:
-                fsr_pc_tmp = torch.zeros(128, 3)
+                # fsr_pc_tmp = torch.zeros(num_FSR_sample_points * 16, 3)
+                fsr_pc_tmp = torch.zeros(8 * 16, 3)
             fsr_pc.append(fsr_pc_tmp)
 
         all_pc = torch.stack(all_pc, dim=0)
@@ -748,12 +771,14 @@ class VecTask(Env):
                     palm_center_offset = torch.tensor([5.7225e-01, 1.0681e-04, 1.7850e-01]).cuda()
                 if imagined_pc is not None:
                     imagined_pc[:, :, :3] -= palm_center_offset
-                    zeros = torch.where(fsr_pc[:, :, :3] == torch.zeros(128, 3).cuda())
+                    zeros = torch.where(fsr_pc[:, :, :3] == torch.zeros(fsr_pc.shape[1], 3).cuda())
                     fsr_pc[zeros[0], :, :] = pc[zeros[0], 0, :].unsqueeze(1)
                     fsr_pc[:, :, :3] -= palm_center_offset
                     pc[:, :, :3] -= palm_center_offset
                     if self.num_point == 808:  # self.ablation_mode in ["multi-modality", "all"]:
                         self.obs_dict["obs"]["pointcloud"] = torch.cat([pc, imagined_pc, fsr_pc], dim=1)
+                        if self.pae:
+                            self.obs_dict["obs"]["pointcloud"] = gen_pc(self.pae, self.obs_dict["obs"]["pointcloud"])
                     elif self.num_point == 680:
                         self.obs_dict["obs"]["pointcloud"] = torch.cat([pc, imagined_pc], dim=1)
                     elif self.num_point == 512:
