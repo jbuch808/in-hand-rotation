@@ -52,8 +52,9 @@ import open3d as o3d
 import pytorch3d
 
 sys.path.append('/workspace/code/Point-Cloud-Autoencoder')
-from model import PointCloudAE2 as PAE
-from model import gen_pc
+from model import PointCloudAE as PAE
+from model import PointCloudAEStudent as PAEStudent
+from model import gen_student_pc
 
 EXISTING_SIM = None
 SCREEN_CAPTURE_RESOLUTION = (1027, 768)
@@ -139,16 +140,25 @@ class Env(ABC):
         self.clip_obs = config["env"].get("clipObservations", np.Inf)
         self.clip_actions = config["env"].get("clipActions", np.Inf)
 
-        pae_checkpoint = config["env"]["observation"]["pointcloud"].get("pae", None)
-        if pae_checkpoint:        
-            self.pae = PAE(808, 128)
-            checkpoint = torch.load(pae_checkpoint, map_location=self.device)
-            base_model = {k.replace('module.', ''): v for k, v in checkpoint['base_model'].items()}
-            self.pae.load_state_dict(base_model)
-            self.pae.eval()
-            self.pae = self.pae.to(self.device)
-        else:
-            self.pae = None
+        self.pae_flag = config["env"]["observation"]["pointcloud"].get("pae", None)
+        if self.pae_flag:
+            pae_teacher_path = config["env"]["observation"]["pointcloud"].get("pae_teacher", None)
+            pae_student_path = config["env"]["observation"]["pointcloud"].get("pae_student", None)
+            self.pae_teacher = PAE(808, 128)
+            self.pae_student = PAEStudent(128)
+
+            teacher_checkpoint = torch.load(pae_teacher_path, map_location=self.device)
+            student_checkpoint = torch.load(pae_student_path, map_location=self.device)
+
+            teacher_model = {k.replace('module.', ''): v for k, v in teacher_checkpoint['base_model'].items()}
+            student_model = {k.replace('module.', ''): v for k, v in student_checkpoint['base_model'].items()}
+
+            self.pae_teacher.load_state_dict(teacher_model)
+            self.pae_student.load_state_dict(student_model)
+            self.pae_teacher.eval()
+            self.pae_student.eval()
+            self.pae_teacher = self.pae_teacher.to(self.device)
+            self.pae_student = self.pae_student.to(self.device)
 
     def set_test_mode(self, is_test=False):
         pass
@@ -776,9 +786,17 @@ class VecTask(Env):
                     fsr_pc[:, :, :3] -= palm_center_offset
                     pc[:, :, :3] -= palm_center_offset
                     if self.num_point == 808:  # self.ablation_mode in ["multi-modality", "all"]:
-                        self.obs_dict["obs"]["pointcloud"] = torch.cat([pc, imagined_pc, fsr_pc], dim=1)
-                        if self.pae:
-                            self.obs_dict["obs"]["pointcloud"] = gen_pc(self.pae, self.obs_dict["obs"]["pointcloud"])
+                        # All
+                        # self.obs_dict["obs"]["pointcloud"] = torch.cat([pc, imagined_pc, fsr_pc], dim=1)
+                        # Camera
+                        self.obs_dict["obs"]["pointcloud"] = torch.cat([pc, imagined_pc], dim=1)
+                        # Tactile
+                        # self.obs_dict["obs"]["pointcloud"] = torch.cat([imagined_pc, fsr_pc], dim=1)
+                        if self.pae_flag:
+                            # Teacher
+                            # self.obs_dict["obs"]["pointcloud"] = gen_pc(self.pae_teacher, self.obs_dict["obs"]["pointcloud"])
+                            # Student
+                            self.obs_dict["obs"]["pointcloud"], _ = gen_student_pc(self.pae_teacher, self.pae_student, self.obs_dict["obs"]["pointcloud"])
                     elif self.num_point == 680:
                         self.obs_dict["obs"]["pointcloud"] = torch.cat([pc, imagined_pc], dim=1)
                     elif self.num_point == 512:
