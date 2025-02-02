@@ -81,7 +81,7 @@ params:
     player_collect: False
     player:
       deterministic: True 
-      games_num: 2
+      games_num: 500
       games_repeat: 1
       desired_games: 10000
       print_stats: True

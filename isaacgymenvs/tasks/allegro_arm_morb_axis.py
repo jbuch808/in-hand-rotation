@@ -1785,7 +1785,8 @@ class AllegroArmMOAR(VecTask):
                                                 self.y_unit_tensor[env_ids], self.z_unit_tensor[env_ids])
 
         if self.obs_type == "full_stack_baoding" or self.obs_type == "partial_stack_baoding":
-            self.root_state_tensor[self.object_indices[env_ids], 3:7] = new_object_rot.clone().unsqueeze(1)
+            # fix for deterministic mode
+            self.root_state_tensor[self.object_indices[env_ids], 3:7] = new_object_rot.unsqueeze(1).expand(-1,2,-1) # new_object_rot.clone().unsqueeze(1)
         else:
             self.root_state_tensor[self.object_indices[env_ids], 3:7] = new_object_rot.clone()
         self.root_state_tensor[self.object_indices[env_ids], 7:13] = torch.zeros_like(self.root_state_tensor[self.object_indices[env_ids], 7:13])
@@ -1810,10 +1811,10 @@ class AllegroArmMOAR(VecTask):
                                                     * torch.rand(len(env_ids), device=self.device) + torch.log(self.force_prob_range[1]))
 
         # reset shadow hand
-        self.arm_hand_dof_pos[env_ids, :] = self.arm_hand_dof_default_pos
-        self.arm_hand_dof_vel[env_ids, :] = self.arm_hand_dof_default_vel 
-        self.prev_targets[env_ids, :self.num_arm_hand_dofs] = self.arm_hand_dof_default_pos
-        self.cur_targets[env_ids, :self.num_arm_hand_dofs] = self.arm_hand_dof_default_vel
+        self.arm_hand_dof_pos[env_ids, :] = self.arm_hand_dof_default_pos.expand(len(env_ids), -1) # self.arm_hand_dof_default_pos
+        self.arm_hand_dof_vel[env_ids, :] = self.arm_hand_dof_default_vel.expand(len(env_ids), -1)
+        self.prev_targets[env_ids, :self.num_arm_hand_dofs] = self.arm_hand_dof_default_pos.expand(len(env_ids), -1)
+        self.cur_targets[env_ids, :self.num_arm_hand_dofs] = self.arm_hand_dof_default_vel.expand(len(env_ids), -1)
 
         hand_indices = self.hand_indices[env_ids].to(torch.int32)
 

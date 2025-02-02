@@ -782,7 +782,7 @@ class VecTask(Env):
                 if imagined_pc is not None:
                     imagined_pc[:, :, :3] -= palm_center_offset
                     zeros = torch.where(fsr_pc[:, :, :3] == torch.zeros(fsr_pc.shape[1], 3).cuda())
-                    fsr_pc[zeros[0], :, :] = pc[zeros[0], 0, :].unsqueeze(1)
+                    fsr_pc[zeros[0], :, :] = pc[zeros[0], 0, :].unsqueeze(1).expand(-1, 128, -1)
                     fsr_pc[:, :, :3] -= palm_center_offset
                     pc[:, :, :3] -= palm_center_offset
                     if self.num_point == 808:  # self.ablation_mode in ["multi-modality", "all"]:
